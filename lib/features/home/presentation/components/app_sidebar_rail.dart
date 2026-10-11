@@ -69,7 +69,14 @@ class AppSidebarRail extends ConsumerWidget {
           const Spacer(),
           _RailBottomIcon(
             icon: Icons.notifications_none_outlined,
-            hasNotification: (ref.watch(workspaceProvider.select((state) => state.selectedWorkspace?.unreadCount)) ?? 0) > 0,
+            hasNotification:
+                (ref.watch(
+                      workspaceProvider.select(
+                        (state) => state.selectedWorkspace?.unreadCount,
+                      ),
+                    ) ??
+                    0) >
+                0,
             onTap: () {
               // Fire a test notification replicating DM notification
               ScaffoldMessenger.of(context).showSnackBar(
