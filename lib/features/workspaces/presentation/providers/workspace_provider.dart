@@ -28,6 +28,7 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
                 name: item['name'] as String? ?? 'Workspace',
                 avatar: item['logo_url'] as String? ?? '',
                 membersCount: (item['channels_count'] as num?)?.toInt() ?? 0,
+                unreadCount: (item['unread_count'] as num?)?.toInt() ?? 0,
               ),
             );
           }
