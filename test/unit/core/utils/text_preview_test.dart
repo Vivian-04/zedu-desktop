@@ -39,6 +39,17 @@ void main() {
       );
     });
 
+    test('decodes numeric character references', () {
+      expect(
+        plainTextPreview('<p>Hi &#128512; &#x1F600; &#39;ok&#x27;</p>'),
+        "Hi 😀 😀 'ok'",
+      );
+      expect(
+        plainTextPreview('&amp;#39; &#xD800; &#0;'),
+        '&#39; &#xD800; &#0;',
+      );
+    });
+
     test('removes underscore emphasis but keeps underscores inside words', () {
       expect(
         plainTextPreview('an _important_ and __very important__ note'),
@@ -71,6 +82,14 @@ void main() {
     test('truncates long text to 80 characters with an ellipsis', () {
       final result = plainTextPreview('a' * 100);
       expect(result, '${'a' * 77}...');
+    });
+
+    test('cuts without an ellipsis when the limit is too short for one', () {
+      expect(plainTextPreview('hello', maxLength: 3), 'hel');
+      expect(plainTextPreview('hello', maxLength: 2), 'he');
+      expect(plainTextPreview('hello', maxLength: 0), '');
+      expect(plainTextPreview('hello', maxLength: -1), '');
+      expect(plainTextPreview('hello', maxLength: 4), 'h...');
     });
 
     test('never cuts an emoji in half when truncating', () {
