@@ -30,7 +30,9 @@ String plainTextPreview(String content, {int maxLength = 80}) {
 
 /// An HTML tag: `<` followed by a tag name, so plain text such as `2 < 3 > 1`
 /// is kept. Quoted attribute values may contain `>`.
-final _htmlTag = RegExp(r'''</?[a-zA-Z][^<>"']*(?:(?:"[^"]*"|'[^']*')[^<>"']*)*>''');
+final _htmlTag = RegExp(
+  r'''</?[a-zA-Z][^<>"']*(?:(?:"[^"]*"|'[^']*')[^<>"']*)*>''',
+);
 
 /// An inline Markdown link or image, `[label](url)` / `![alt](url)`.
 final _markdownLink = RegExp(r'!?\[([^\]]*)\]\([^)\s]*\)');
