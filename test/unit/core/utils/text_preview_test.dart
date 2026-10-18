@@ -11,6 +11,12 @@ void main() {
       );
     });
 
+    test('keeps words apart across <br> tags with attributes', () {
+      expect(plainTextPreview('Hello<br>World'), 'Hello World');
+      expect(plainTextPreview('Hello<br/>World'), 'Hello World');
+      expect(plainTextPreview('Hello<br class="break">World'), 'Hello World');
+    });
+
     test('handles > inside quoted attribute values', () {
       expect(plainTextPreview('<a title="2 > 1">Open</a>'), 'Open');
     });
@@ -30,6 +36,17 @@ void main() {
       expect(
         plainTextPreview('**Fixed** it, *really* ~~maybe~~ `now`'),
         'Fixed it, really maybe now',
+      );
+    });
+
+    test('removes underscore emphasis but keeps underscores inside words', () {
+      expect(
+        plainTextPreview('an _important_ and __very important__ note'),
+        'an important and very important note',
+      );
+      expect(
+        plainTextPreview('keep snake_case_name and my_var'),
+        'keep snake_case_name and my_var',
       );
     });
 
