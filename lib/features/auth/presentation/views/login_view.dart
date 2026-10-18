@@ -202,14 +202,22 @@ class _LoginViewState extends ConsumerState<LoginView> {
                         children: [
                           Row(
                             children: [
-                              Checkbox(
-                                value: _rememberMe,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _rememberMe = value ?? false;
-                                  });
-                                },
+                              // Constrain the checkbox so its 18px visual square
+                              // sits flush with the form's left edge, instead of
+                              // being centered inside the default 48px tap target.
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: Checkbox(
+                                  value: _rememberMe,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _rememberMe = value ?? false;
+                                    });
+                                  },
+                                ),
                               ),
+                              const SizedBox(width: 10),
                               const Text('Remember me'),
                             ],
                           ),
