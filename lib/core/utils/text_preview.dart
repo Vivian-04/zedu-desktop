@@ -13,10 +13,7 @@ String plainTextPreview(String content, {int maxLength = 80}) {
   text = _decodeHtmlEntities(text);
   text = text
       .replaceAllMapped(_markdownLink, (match) => match[1]!)
-      .replaceAllMapped(
-        RegExp(r'(\*\*|~~|`|\*)(.+?)\1'),
-        (match) => match[2]!,
-      )
+      .replaceAllMapped(RegExp(r'(\*\*|~~|`|\*)(.+?)\1'), (match) => match[2]!)
       .replaceAllMapped(_underscoreEmphasis, (match) => match[2]!);
   text = text.replaceAll(RegExp(r'\s+'), ' ').trim();
 
