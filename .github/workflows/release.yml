@@ -1,0 +1,191 @@
+# Publishes installable desktop builds to a GitHub Release.
+#
+# Self-contained on purpose: it calls no reusable workflow, so it cannot break
+# the way the zedu-ci callers did. First-party actions and the `gh` CLI only, so
+# there is no third-party action in the path that can pull the supply chain.
+#
+# A tag matching v* publishes automatically. workflow_dispatch lets you cut a
+# release from any branch without pushing a tag first.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish, e.g. v0.1.0"
+        required: true
+        type: string
+      draft:
+        description: "Create as a draft release"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  FLUTTER_VERSION: "3.41.5"
+
+jobs:
+  # Gate the release on the same checks the PR pipeline runs, so a tag on a red
+  # branch cannot ship a broken binary.
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Provide .env for the asset bundle
+        run: cp .env.example .env 2>/dev/null || touch .env
+
+      - name: Dart analyze
+        run: flutter analyze --fatal-infos --fatal-warnings
+
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Tests
+        run: flutter test
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            artifact: zedu-linux
+          - os: windows-latest
+            platform: windows
+            artifact: zedu-windows
+          - os: macos-latest
+            platform: macos
+            artifact: zedu-macos
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Provide .env for the asset bundle
+        run: cp .env.example .env 2>/dev/null || touch .env
+
+      - name: Build ${{ matrix.platform }} release
+        run: flutter build ${{ matrix.platform }} --release
+
+      - name: Package ${{ matrix.platform }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.platform }}" in
+            linux)
+              tar -czf "${{ matrix.artifact }}.tar.gz" -C build/linux .
+              echo "PACKAGED=${{ matrix.artifact }}.tar.gz" >> "$GITHUB_ENV"
+              ;;
+            windows)
+              # ship the whole bundle: the exe needs its DLLs and data/ next to it
+              7z a "${{ matrix.artifact }}.zip" "build\windows\runner\Release\*"
+              echo "PACKAGED=${{ matrix.artifact }}.zip" >> "$GITHUB_ENV"
+              ;;
+            macos)
+              ditto -c -k --keepParent "build/macos/Build/Products/Release/zedu.app" "${{ matrix.artifact }}.zip"
+              echo "PACKAGED=${{ matrix.artifact }}.zip" >> "$GITHUB_ENV"
+              ;;
+          esac
+
+      - name: Checksum
+        shell: bash
+        run: sha256sum "$PACKAGED" > "$PACKAGED.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ env.PACKAGED }}
+            ${{ env.PACKAGED }}.sha256
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect release notes
+        id: notes
+        run: |
+          {
+            echo "## What's in this build"
+            echo
+            echo "Desktop builds for Linux, Windows and macOS, built from \`${GITHUB_SHA}\` on \`${{ github.ref_name }}\`."
+            echo
+            echo "### Install"
+            echo
+            echo "- **Linux** (\`zedu-linux.tar.gz\`): extract the tarball and run the binary in the bundle root."
+            echo "- **macOS** (\`zedu-macos.zip\`): unzip, then right-click the app > Open to get past Gatekeeper."
+            echo "- **Windows** (\`zedu-windows.zip\`): unzip and run the \`.exe\`; SmartScreen > More info > Run anyway."
+            echo
+            echo "Every archive ships a \`.sha256\` file."
+          } > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          DRAFT: ${{ github.event.inputs.draft || false }}
+        run: |
+          set -euo pipefail
+          notes="$(cat "$RUNNER_TEMP/notes.md")"
+          args=(create "$TAG" --title "$TAG" --notes "$notes" --target "$GITHUB_SHA")
+          [ "$DRAFT" = "true" ] && args+=(--draft)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # re-running on the same tag replaces the assets rather than failing
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --title "$TAG" --notes "$notes"
+            echo "updated existing release $TAG"
+          else
+            gh release "${args[@]}"
+            gh release upload "$TAG" dist/* --clobber
+            echo "created release $TAG"
+          fi
+          echo
+          echo "Release URL:"
+          gh release view "$TAG" --json url --jq .url
