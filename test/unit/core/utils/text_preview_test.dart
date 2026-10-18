@@ -17,6 +17,15 @@ void main() {
       expect(plainTextPreview('Hello<br class="break">World'), 'Hello World');
     });
 
+    test('keeps list items apart when </li> is omitted', () {
+      expect(plainTextPreview('<ul><li>First<li>Second</ul>'), 'First Second');
+      expect(
+        plainTextPreview('<ul><li class="x">First</li><li>Second</li></ul>'),
+        'First Second',
+      );
+      expect(plainTextPreview('<link href="a">Hi'), 'Hi');
+    });
+
     test('handles > inside quoted attribute values', () {
       expect(plainTextPreview('<a title="2 > 1">Open</a>'), 'Open');
     });

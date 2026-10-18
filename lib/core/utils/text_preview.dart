@@ -28,10 +28,12 @@ String plainTextPreview(String content, {int maxLength = 80}) {
   return '${characters.take(limit - 3).string}...';
 }
 
-/// A `<br>` (with or without attributes) or the end of a block element,
-/// which become a space so the words on either side stay apart.
+/// A `<br>` or `<li>` (with or without attributes, since `</li>` may be
+/// omitted) or the end of a block element, which become a space so the words
+/// on either side stay apart.
 final _lineBreak = RegExp(
-  r'''<br\b[^<>"']*(?:(?:"[^"]*"|'[^']*')[^<>"']*)*>|</(p|div|li|h[1-6])\s*>''',
+  r'''<(?:br|li)\b[^<>"']*(?:(?:"[^"]*"|'[^']*')[^<>"']*)*>'''
+  r'''|</(p|div|li|h[1-6])\s*>''',
   caseSensitive: false,
 );
 
