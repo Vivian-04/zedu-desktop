@@ -91,9 +91,7 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
     if (_config.usesMockData) return;
     // #584: the API deactivates your own account at DELETE /users/me
     // (DeactivateSelfUser); /profile/account does not exist.
-    await _apiBaseService.delete<Map<String, dynamic>>(
-      path: '/users/me',
-    );
+    await _apiBaseService.delete<Map<String, dynamic>>(path: '/users/me');
   }
 
   @override
