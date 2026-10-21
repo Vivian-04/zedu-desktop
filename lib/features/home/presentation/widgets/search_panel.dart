@@ -52,7 +52,6 @@ class _SearchPanelState extends ConsumerState<SearchPanel> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final state = ref.watch(searchNotifierProvider);
-    final query = _searchController.text;
 
     return Container(
       width: 320,
@@ -117,17 +116,13 @@ class _SearchPanelState extends ConsumerState<SearchPanel> {
               onSubmitted: _performSearch,
             ),
           ),
-          Expanded(child: _buildBody(context, state, query)),
+          Expanded(child: _buildBody(context, state)),
         ],
       ),
     );
   }
 
-  Widget _buildBody(
-    BuildContext context,
-    SearchState state,
-    String query,
-  ) {
+  Widget _buildBody(BuildContext context, SearchState state) {
     final colors = context.colors;
 
     if (state.isLoading) {
@@ -152,7 +147,9 @@ class _SearchPanelState extends ConsumerState<SearchPanel> {
     if (state.results.isEmpty) {
       return Center(
         child: Text(
-          query.trim().isEmpty ? 'Enter a search term' : 'No results found',
+          state.query.trim().isEmpty
+              ? 'Enter a search term'
+              : 'No results found',
           style: TextStyle(color: colors.textHint),
         ),
       );
