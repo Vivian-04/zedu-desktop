@@ -52,6 +52,75 @@ class NotificationPreferencesModel extends NotificationPreferences {
     'email_notifications': emailNotifications,
   };
 
+  /// Reads the Zedu API's `GET /users/notification-preferences` body (#586).
+  ///
+  /// The API stores `notify_about` as `{ "Option": "..." }`, 24-hour
+  /// `from_hour`/`to_hour`, and `notification_method_email`. It has no
+  /// "use desktop settings" flag, so [useDesktopSettings] is kept on the
+  /// device and passed in.
+  factory NotificationPreferencesModel.fromApiJson(
+    Map<String, dynamic> json, {
+    bool useDesktopSettings = true,
+  }) {
+    final notifyAbout = json['notify_about'];
+    final option = notifyAbout is Map ? notifyAbout['Option'] as String? : null;
+    return NotificationPreferencesModel(
+      mode: switch (option) {
+        'direct_messages_mentions' => NotificationMode.mentionsOnly,
+        'nothing' => NotificationMode.none,
+        _ => NotificationMode.allMessages,
+      },
+      fromTime: _to12Hour(json['from_hour'] as String?, '12:00 AM'),
+      toTime: _to12Hour(json['to_hour'] as String?, '11:00 PM'),
+      useDesktopSettings: useDesktopSettings,
+      emailNotifications: json['notification_method_email'] as bool? ?? false,
+    );
+  }
+
+  /// The body for `PUT /users/notification-preferences` (#586).
+  Map<String, dynamic> toApiJson() {
+    final from = _to24Hour(fromTime);
+    final to = _to24Hour(toTime);
+    return {
+      'notify_about': {
+        'Option': switch (mode) {
+          NotificationMode.allMessages => 'all_new_messages',
+          NotificationMode.mentionsOnly => 'direct_messages_mentions',
+          NotificationMode.none => 'nothing',
+        },
+      },
+      // A window that starts and ends at the same time means "any time".
+      'notification_schedule': from != to,
+      'from_hour': from,
+      'to_hour': to,
+      'notification_method_email': emailNotifications,
+    };
+  }
+
+  /// "08:00" or "20:30" (API) → "08:00 AM" / "08:30 PM" (this app).
+  static String _to12Hour(String? value, String fallback) {
+    final match = RegExp(
+      r'^(\d{1,2}):(\d{2})$',
+    ).firstMatch(value?.trim() ?? '');
+    if (match == null) return fallback;
+    final hour = int.parse(match.group(1)!);
+    if (hour > 23) return fallback;
+    final suffix = hour >= 12 ? 'PM' : 'AM';
+    final hour12 = hour % 12 == 0 ? 12 : hour % 12;
+    return '${hour12.toString().padLeft(2, '0')}:${match.group(2)} $suffix';
+  }
+
+  /// "08:00 AM" / "8:30 PM" (this app) → "08:00" / "20:30" (API).
+  static String _to24Hour(String value) {
+    final match = RegExp(
+      r'^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$',
+    ).firstMatch(value.trim());
+    if (match == null) return '00:00';
+    var hour = int.parse(match.group(1)!) % 12;
+    if (match.group(3)!.toUpperCase() == 'PM') hour += 12;
+    return '${hour.toString().padLeft(2, '0')}:${match.group(2)}';
+  }
+
   static NotificationMode _modeFromJson(String? value) {
     return switch (value) {
       'mentionsOnly' || 'mentions_only' => NotificationMode.mentionsOnly,

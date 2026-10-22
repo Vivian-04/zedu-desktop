@@ -99,10 +99,12 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
     if (_config.usesMockData) {
       return NotificationPreferencesModel.fromJson(_notifications);
     }
+    // #586: the API serves these at /users/notification-preferences;
+    // /profile/notifications does not exist.
     final response = await _apiBaseService.get<Map<String, dynamic>>(
-      path: '/profile/notifications',
+      path: '/users/notification-preferences',
     );
-    return NotificationPreferencesModel.fromJson(
+    return NotificationPreferencesModel.fromApiJson(
       response.data['data'] as Map<String, dynamic>,
     );
   }
@@ -120,18 +122,20 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
         emailNotifications: preferences.emailNotifications,
       );
     }
-    final response = await _apiBaseService.patch<Map<String, dynamic>>(
-      path: '/profile/notifications',
+    final response = await _apiBaseService.put<Map<String, dynamic>>(
+      path: '/users/notification-preferences',
       data: NotificationPreferencesModel(
         mode: preferences.mode,
         fromTime: preferences.fromTime,
         toTime: preferences.toTime,
         useDesktopSettings: preferences.useDesktopSettings,
         emailNotifications: preferences.emailNotifications,
-      ).toJson(),
+      ).toApiJson(),
     );
-    return NotificationPreferencesModel.fromJson(
+    // The API doesn't store "use desktop settings"; keep the person's choice.
+    return NotificationPreferencesModel.fromApiJson(
       response.data['data'] as Map<String, dynamic>,
+      useDesktopSettings: preferences.useDesktopSettings,
     );
   }
 
