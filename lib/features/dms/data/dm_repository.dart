@@ -71,23 +71,67 @@ class DmRepository {
     List<XFile>? media,
     List<dynamic>? mentions,
   }) async {
+    final uploadedMedia = media != null && media.isNotEmpty
+        ? await _uploadFiles(media)
+        : null;
+
     await _apiClient.post<Map<String, dynamic>>(
       path: '/channels/$channelId/messages',
       data: {
         "content": content,
-        if (media != null && media.isNotEmpty)
-          "media": media.map(_mediaPayloadFromFile).toList(),
+        "media": ?uploadedMedia,
         ...?(mentions != null ? {'mentions': mentions} : null),
       },
     );
   }
 
-  Map<String, dynamic> _mediaPayloadFromFile(XFile file) {
-    return {
-      'name': file.name,
-      'path': file.path,
-      if (file.mimeType != null) 'mime_type': file.mimeType,
-    };
+  Future<List<Map<String, dynamic>>> _uploadFiles(List<XFile> files) async {
+    final formData = FormData();
+    for (final file in files) {
+      final mime = file.mimeType;
+      final filename = file.name.isNotEmpty ? file.name : 'attachment';
+      final contentType = mime != null && mime.contains('/')
+          ? DioMediaType.parse(mime)
+          : null;
+
+      formData.files.add(
+        MapEntry(
+          'files',
+          file.path.isNotEmpty
+              ? await MultipartFile.fromFile(
+                  file.path,
+                  filename: filename,
+                  contentType: contentType,
+                )
+              : MultipartFile.fromBytes(
+                  await file.readAsBytes(),
+                  filename: filename,
+                  contentType: contentType,
+                ),
+        ),
+      );
+    }
+
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      path: '/files/upload-files',
+      data: formData,
+    );
+
+    final rawFiles = response.data['data'];
+    if (rawFiles is! List ||
+        rawFiles.length != files.length ||
+        rawFiles.any((file) => file is! Map)) {
+      throw ApiFailure(
+        message: 'Upload failed. Please try again.',
+        path: '/files/upload-files',
+        kind: ApiFailureKind.client,
+      );
+    }
+
+    return rawFiles
+        .whereType<Map<dynamic, dynamic>>()
+        .map((file) => Map<String, dynamic>.from(file))
+        .toList();
   }
 
   Future<void> editMessage(
